@@ -27,7 +27,11 @@ private:
 	// Set up Direct2D
 	ID2D1Factory* m_pD2DFactory;
 	ID2D1EllipseGeometry* m_pEllipseGeometry;
+	ID2D1HwndRenderTarget* m_pRenderTarget;
+	ID2D1SolidColorBrush* m_pBlackBrush;
 	HRESULT CreateDeviceIndependentResources();
 	HRESULT CreateDeviceResources(HWND hwnd);
+	HRESULT OnRender(HWND hwnd);
+	void OnResize(UINT width, UINT height);
 };
 

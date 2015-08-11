@@ -2,7 +2,7 @@
 #include "App.h"
 
 
-App::App()
+App::App() : m_pRenderTarget(NULL)
 {
 }
 
@@ -129,8 +129,19 @@ LRESULT App::WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		case WM_PAINT:
 			{
 				hdc = BeginPaint(hWnd, &ps);
+				pApp->OnRender(hWnd);
 				EndPaint(hWnd, &ps);
 			}
+			break;
+		case WM_SIZE:
+			{
+				UINT width = LOWORD(lParam);
+				UINT height = HIWORD(lParam);
+				pApp->OnResize(width, height);
+			}
+			break;
+		case WM_DISPLAYCHANGE:
+			pApp->OnRender(hWnd);
 			break;
 		case WM_DESTROY:
 			PostQuitMessage(0);
@@ -170,4 +181,65 @@ HRESULT App::CreateDeviceIndependentResources()
 		hr = m_pD2DFactory->CreateEllipseGeometry(ellipse, &m_pEllipseGeometry);
 	}
 	return hr;
+}
+
+HRESULT App::CreateDeviceResources(HWND hwnd)
+{
+	HRESULT hr = S_OK;
+	if (!m_pRenderTarget)
+	{
+		RECT rc;
+		GetClientRect(hwnd, &rc);
+		D2D1_SIZE_U size = D2D1::SizeU(rc.right - rc.left, rc.bottom - rc.top);
+
+		// Create a Direct2D render target
+		hr = m_pD2DFactory->CreateHwndRenderTarget(
+			D2D1::RenderTargetProperties(),
+			D2D1::HwndRenderTargetProperties(hwnd, size),
+			&m_pRenderTarget);
+		if (SUCCEEDED(hr))
+		{
+			// Create a black brush
+			hr = m_pRenderTarget->CreateSolidColorBrush(
+				D2D1::ColorF(D2D1::ColorF::Black),
+				&m_pBlackBrush);
+		}
+	}
+	return hr;
+}
+
+HRESULT App::OnRender(HWND hwnd)
+{
+	HRESULT hr = CreateDeviceResources(hwnd);
+	if (SUCCEEDED(hr))
+	{
+		if (!(m_pRenderTarget->CheckWindowState()&D2D1_WINDOW_STATE_OCCLUDED))
+		{
+			m_pRenderTarget->BeginDraw();
+			m_pRenderTarget->Clear(D2D1::ColorF(D2D1::ColorF::White));
+			m_pRenderTarget->FillGeometry(m_pEllipseGeometry, m_pBlackBrush);
+			hr = m_pRenderTarget->EndDraw();
+
+			if (hr == D2DERR_RECREATE_TARGET)
+			{
+				hr = S_OK;
+				m_pRenderTarget->Release();
+				m_pRenderTarget = NULL;
+				m_pBlackBrush->Release();
+				m_pBlackBrush = NULL;
+			}
+		}
+	}
+	return hr;
+}
+
+void App::OnResize(UINT width, UINT height)
+{
+	if (m_pRenderTarget)
+	{
+		D2D1_SIZE_U size;
+		size.width = width;
+		size.height = height;
+		m_pRenderTarget->Resize(size);
+	}
 }
