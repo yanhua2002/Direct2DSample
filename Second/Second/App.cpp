@@ -50,6 +50,10 @@ BOOL App::Init(HINSTANCE instance, int cmd)
 
 BOOL App::InitInstance(int nCmdShow)
 {
+	HRESULT hr = CreateDeviceIndependentResources();
+	if (FAILED(hr))
+		return FALSE;
+
 	HWND hWnd = CreateWindowW(szWindowClass, szTitle, WS_OVERLAPPEDWINDOW,
 		CW_USEDEFAULT, 0, CW_USEDEFAULT, 0, nullptr, nullptr, hInst, this);
 
@@ -154,4 +158,16 @@ INT_PTR App::About(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 		break;
 	}
 	return (INT_PTR)FALSE;
+}
+
+HRESULT App::CreateDeviceIndependentResources()
+{
+	HRESULT hr = D2D1CreateFactory(D2D1_FACTORY_TYPE_SINGLE_THREADED, &m_pD2DFactory);
+	if (SUCCEEDED(hr))
+	{
+		// Create an ellipse geometry
+		D2D1_ELLIPSE ellipse = D2D1::Ellipse(D2D1::Point2F(105.0f, 105.0f), 25.0f, 25.0f);
+		hr = m_pD2DFactory->CreateEllipseGeometry(ellipse, &m_pEllipseGeometry);
+	}
+	return hr;
 }
