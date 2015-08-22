@@ -48,8 +48,7 @@ HRESULT DemoApp::Initialize()
 	if (SUCCEEDED(hr))
 	{
 		// Register the window class
-		WNDCLASSEX wcex;
-		wcex.cbSize = sizeof(WNDCLASSEX);
+		WNDCLASSEX wcex = { sizeof(WNDCLASSEX) };
 		wcex.style = CS_HREDRAW | CS_VREDRAW;
 		wcex.lpfnWndProc = DemoApp::WndProc;
 		wcex.cbClsExtra = 0;

@@ -1,5 +1,9 @@
 #pragma once
 
+#pragma comment(lib,"d2d1")
+#pragma comment(lib,"dwrite")
+#pragma comment(lib,"windowscodecs")
+
 #ifndef WINVER
 #define	WINVER	0x0700
 #endif // !WINVER

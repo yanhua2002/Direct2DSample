@@ -94,6 +94,10 @@
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
+    <Manifest />
+    <Manifest>
+      <EnableDpiAwareness>true</EnableDpiAwareness>
+    </Manifest>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
@@ -146,10 +150,17 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="resource.h" />
     <ClInclude Include="SimpleDirect2dApplication.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="SimpleDirect2dApplication.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <Image Include="sampleImage.jpg" />
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="SampleD2D.rc" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
