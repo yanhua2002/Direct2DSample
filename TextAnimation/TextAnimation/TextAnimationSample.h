@@ -24,6 +24,7 @@
 
 // Windows header files
 #include <Windows.h>
+#include <strsafe.h>
 
 // C runtime header files
 #include <stdlib.h>
