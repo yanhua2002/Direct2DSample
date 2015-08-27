@@ -425,3 +425,43 @@ HRESULT DemoApp::ResetAnimation(bool resetClock)
 
 	return hr;
 }
+
+// Calculates the transform based on the current time
+void DemoApp::CalculateTransform(D2D1_MATRIX_3X2_F *pTransform)
+{
+	// Calculate a 't' value that will linearly interpolate from 0 to 1 and back every 20s
+	DWORD currentTime = GetTickCount();
+	if (m_startTime == 0)
+		m_startTime = currentTime;
+	float t = 2 * ((currentTime - m_startTime) % 20000) / 20000.f;
+	if (t > 1.f)
+		t = 2 - t;
+
+	// Calculate animation parameters
+	float rotation = 0;
+	float translationOffset = 0;
+	float scaleMultiplier = 1.f;
+	if (m_animationStyle&AnimationStyle::Translation)
+	{
+		// range from -100 to 100
+		translationOffset = (t - 0.5f) * 200;
+	}
+
+	if (m_animationStyle&AnimationStyle::Rotation)
+	{
+		// range from 0 to 360
+		rotation = t*360.f;
+	}
+
+	if (m_animationStyle&AnimationStyle::Scaling)
+	{
+		// range from 1/4 to 2x the normal size
+		scaleMultiplier = t*1.75f + 0.25f;
+	}
+
+	D2D1_SIZE_F size = m_pRT->GetSize();
+	*pTransform =
+		D2D1::Matrix3x2F::Rotation(rotation)
+		*D2D1::Matrix3x2F::Scale(scaleMultiplier, scaleMultiplier)
+		*D2D1::Matrix3x2F::Translation(translationOffset + size.width / 2.f, translationOffset + size.height / 2.f);
+}
