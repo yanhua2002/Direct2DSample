@@ -24,7 +24,7 @@ int APIENTRY wWinMain(
 	return 0;
 }
 
-DemoApp::DemoApp():
+DemoApp::DemoApp() :
 	m_hwnd(NULL),
 	m_pD2DFactory(NULL),
 	m_pDWriteFactory(NULL),
@@ -77,7 +77,7 @@ HRESULT DemoApp::Initialize()
 		m_pD2DFactory->GetDesktopDpi(&dpiX, &dpiY);
 
 		m_hwnd = CreateWindow(
-			L"D2DDemApp", L"D2D Demo App", WS_OVERLAPPEDWINDOW,
+			L"D2DDemoApp", L"D2D Demo App", WS_OVERLAPPEDWINDOW,
 			CW_USEDEFAULT, CW_USEDEFAULT, static_cast<UINT>(ceil(640.f*dpiX / 96.f)), static_cast<UINT>(ceil(480.f*dpiY / 96.f)),
 			NULL, NULL, HINST_THISCOMPONENT, this);
 		hr = m_hwnd ? S_OK : E_FAIL;
@@ -196,7 +196,7 @@ HRESULT DemoApp::CreateDeviceResources()
 	return hr;
 }
 
-void DemoApp :: DiscardDeviceResources()
+void DemoApp::DiscardDeviceResources()
 {
 	SafeRelease(&m_pRT);
 	SafeRelease(&m_pBlackBrush);
@@ -218,7 +218,7 @@ void DemoApp::RunMessageLoop()
 }
 
 // Responds to input from the user
-HRESULT DemoApp::OnChar(short key)
+HRESULT DemoApp::OnChar(SHORT key)
 {
 	HRESULT hr = S_OK;
 
@@ -227,35 +227,35 @@ HRESULT DemoApp::OnChar(short key)
 
 	switch (key)
 	{
-		case 't':
-			if (m_animationStyle&AnimationStyle::Translation)
-				m_animationStyle &= ~AnimationStyle::Translation;
-			else
-				m_animationStyle |= AnimationStyle::Translation;
-			break;
-		case 'r':
-			if (m_animationStyle&AnimationStyle::Rotation)
-				m_animationStyle &= ~AnimationStyle::Rotation;
-			else
-				m_animationStyle |= AnimationStyle::Rotation;
-			break;
-		case 's':
-			if (m_animationStyle&AnimationStyle::Scaling)
-				m_animationStyle &= ~AnimationStyle::Scaling;
-			else
-				m_animationStyle |= AnimationStyle::Scaling;
-			break;
+	case 't':
+		if (m_animationStyle&AnimationStyle::Translation)
+			m_animationStyle &= ~AnimationStyle::Translation;
+		else
+			m_animationStyle |= AnimationStyle::Translation;
+		break;
+	case 'r':
+		if (m_animationStyle&AnimationStyle::Rotation)
+			m_animationStyle &= ~AnimationStyle::Rotation;
+		else
+			m_animationStyle |= AnimationStyle::Rotation;
+		break;
+	case 's':
+		if (m_animationStyle&AnimationStyle::Scaling)
+			m_animationStyle &= ~AnimationStyle::Scaling;
+		else
+			m_animationStyle |= AnimationStyle::Scaling;
+		break;
 
-		case '1':
-		case '2':
-		case '3':
-			m_renderingMethod = static_cast<TextRenderingMethod::Enum>(key - '1');
-			resetClock = false;
-			break;
+	case '1':
+	case '2':
+	case '3':
+		m_renderingMethod = static_cast<TextRenderingMethod::Enum>(key - '1');
+		resetClock = false;
+		break;
 
-		default:
-			resetAnimation = false;
-			resetClock = false;
+	default:
+		resetAnimation = false;
+		resetClock = false;
 	}
 
 	if (resetAnimation)
@@ -464,4 +464,189 @@ void DemoApp::CalculateTransform(D2D1_MATRIX_3X2_F *pTransform)
 		D2D1::Matrix3x2F::Rotation(rotation)
 		*D2D1::Matrix3x2F::Scale(scaleMultiplier, scaleMultiplier)
 		*D2D1::Matrix3x2F::Translation(translationOffset + size.width / 2.f, translationOffset + size.height / 2.f);
+}
+
+// Called whenever the app needs to display the client window
+HRESULT DemoApp::OnRender()
+{
+	HRESULT hr;
+	// We use a ring buffer to store the clock time for the last 10 frames
+	// This lets us eliminate a lot of noise when computing framerates
+	LARGE_INTEGER time;
+	QueryPerformanceCounter(&time);
+	m_times.Add(time.QuadPart);
+
+	hr = CreateDeviceResources();
+
+	if (SUCCEEDED(hr) && !(m_pRT->CheckWindowState()&D2D1_WINDOW_STATE_OCCLUDED))
+	{
+		D2D1_MATRIX_3X2_F transform;
+		CalculateTransform(&transform);
+
+		m_pRT->BeginDraw();
+
+		m_pRT->Clear(D2D1::ColorF(D2D1::ColorF::White));
+		m_pRT->SetTransform(transform);
+
+		DWRITE_TEXT_METRICS textMetrics;
+		m_pTextLayout->GetMetrics(&textMetrics);
+
+		if (m_renderingMethod == TextRenderingMethod::UseA8Target)
+		{
+			// Offset the destination rect such that the text will be centered on the render target
+			D2D1_SIZE_F opacityRTSize = m_pOpacityRT->GetSize();
+			D2D1_POINT_2F offset = D2D1::Point2F(
+				-textMetrics.width / 2.f - m_overhangOffset.x,
+				-textMetrics.height / 2.f - m_overhangOffset.y);
+
+			// Round the offset to the nearest pixel. Note that the rounding done here is unnecessary,
+			// but it causes the test to be less blurry
+			float dpiX, dpiY;
+			m_pRT->GetDpi(&dpiX, &dpiY);
+			D2D1_POINT_2F roundedOffset = D2D1::Point2F(
+				floor(offset.x*dpiX / 96.f + 0.5f)*96.f / dpiX,
+				floor(offset.y*dpiY / 96.f + 0.5f)*96.f / dpiY);
+
+			D2D1_RECT_F destinationRect = D2D1::RectF(
+				roundedOffset.x,
+				roundedOffset.y,
+				roundedOffset.x + opacityRTSize.width,
+				roundedOffset.y + opacityRTSize.height);
+
+			ID2D1Bitmap *pBitmap = NULL;
+			m_pOpacityRT->GetBitmap(&pBitmap);
+
+			pBitmap->GetDpi(&dpiX, &dpiY);
+
+			// The antilias mode must be set to D2D1_ANTILIAS_MODE_ALIASED
+			// for this method to succeed. We've set this mode already though
+			// so no need to do it again
+			m_pRT->FillOpacityMask(
+				pBitmap,
+				m_pBlackBrush,
+				D2D1_OPACITY_MASK_CONTENT_TEXT_NATURAL,
+				&destinationRect);
+
+			pBitmap->Release();
+		}
+		else
+		{
+			// Disable pixel snapping to get a smoother animation
+			m_pRT->DrawTextLayout(
+				D2D1::Point2F(-textMetrics.width / 2.f, -textMetrics.height / 2.f),
+				m_pTextLayout,
+				m_pBlackBrush,
+				D2D1_DRAW_TEXT_OPTIONS_NO_SNAP);
+		}
+
+		hr = m_pRT->EndDraw();
+
+		if (hr == D2DERR_RECREATE_TARGET)
+		{
+			hr = S_OK;
+			DiscardDeviceResources();
+		}
+
+		// To animate as quickly as possible, we request another WM_PAINT immediately
+		InvalidateRect(m_hwnd, NULL, false);
+	}
+
+	UpdateWindowText();
+	return hr;
+}
+
+// OnResize, resizes the render target appropriately
+void DemoApp::OnResize(UINT width, UINT height)
+{
+	if (m_pRT)
+	{
+		D2D1_SIZE_U size;
+		size.width = width;
+		size.height = height;
+
+		m_pRT->Resize(size);
+	}
+}
+
+// OnDestroy
+void DemoApp::OnDestroy()
+{
+	m_fRunning = false;
+}
+
+// Window message handler
+LRESULT CALLBACK DemoApp::WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
+{
+	LRESULT result = 0;
+	if (message == WM_CREATE)
+	{
+		LPCREATESTRUCT pcs = (LPCREATESTRUCT)lParam;
+		DemoApp *pDemoApp = (DemoApp *)pcs->lpCreateParams;
+
+		::SetWindowLongPtrW(
+			hwnd,
+			GWLP_USERDATA,
+			PtrToUlong(pDemoApp));
+
+		result = 1;
+	}
+	else
+	{
+		DemoApp *pDemoApp = reinterpret_cast<DemoApp *>(static_cast<LONG_PTR>(
+			::GetWindowLongPtrW(
+				hwnd,
+				GWLP_USERDATA)));
+
+		bool wasHandled = false;
+
+		if (pDemoApp)
+		{
+			switch (message)
+			{
+			case WM_SIZE:
+				{
+					UINT width = LOWORD(lParam);
+					UINT height = HIWORD(lParam);
+					pDemoApp->OnResize(width, height);
+				}
+				result = 0;
+				wasHandled = true;
+				break;
+
+			case WM_CHAR:
+				{
+					pDemoApp->OnChar(static_cast<short>(wParam));
+				}
+				result = 0;
+				wasHandled = true;
+				break;
+
+			case WM_PAINT:
+			case WM_DISPLAYCHANGE:
+				{
+					PAINTSTRUCT ps;
+					BeginPaint(hwnd, &ps);
+					pDemoApp->OnRender();
+					EndPaint(hwnd, &ps);
+				}
+				result = 0;
+				wasHandled = true;
+				break;
+
+			case WM_DESTROY:
+				{
+					pDemoApp->OnDestroy();
+					PostQuitMessage(0);
+				}
+				result = 1;
+				wasHandled = true;
+				break;
+			}
+		}
+
+		if (!wasHandled)
+			result = DefWindowProc(hwnd, message, wParam, lParam);
+	}
+
+	return result;
 }
