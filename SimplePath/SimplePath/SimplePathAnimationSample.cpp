@@ -182,3 +182,201 @@ HRESULT DemoApp::CreateDeviceIndependentResources()
 	SafeRelease(&pSink);
 	return hr;
 }
+
+// Create Device Resources
+HRESULT DemoApp::CreateDeviceResources()
+{
+	HRESULT hr = S_OK;
+	if (!m_pRT)
+	{
+		RECT rc;
+		GetClientRect(m_hwnd, &rc);
+
+		D2D1_SIZE_U size = D2D1::SizeU(rc.right - rc.left, rc.bottom - rc.top);
+
+		// Create a Direct2D render target
+		hr = m_pD2DFactory->CreateHwndRenderTarget(
+			D2D1::RenderTargetProperties(),
+			D2D1::HwndRenderTargetProperties(m_hwnd, size),
+			&m_pRT);
+
+		if (SUCCEEDED(hr))
+		{
+			// Create a red brush
+			hr = m_pRT->CreateSolidColorBrush(
+				D2D1::ColorF(D2D1::ColorF::Red),
+				&m_pRedBrush);
+		}
+		if (SUCCEEDED(hr))
+		{
+			// Create a yellow brush
+			hr = m_pRT->CreateSolidColorBrush(
+				D2D1::ColorF(D2D1::ColorF::Yellow),
+				&m_pYellowBrush);
+		}
+	}
+
+	return hr;
+}
+
+// Discard device resources
+void DemoApp::DiscardDeviceResources()
+{
+	SafeRelease(&m_pRT);
+	SafeRelease(&m_pRedBrush);
+	SafeRelease(&m_pYellowBrush);
+}
+
+// Main window message loop
+void DemoApp::RunMessageLoop()
+{
+	MSG msg;
+	while (GetMessage(&msg,NULL,0,0))
+	{
+		TranslateMessage(&msg);
+		DispatchMessage(&msg);
+	}
+}
+
+// OnRender
+HRESULT DemoApp::OnRender()
+{
+	HRESULT hr = CreateDeviceResources();
+	if (SUCCEEDED(hr) && !(m_pRT->CheckWindowState()&D2D1_WINDOW_STATE_OCCLUDED))
+	{
+		D2D1_POINT_2F point, tangent;
+		D2D1_MATRIX_3X2_F triangleMatrix;
+		D2D1_SIZE_F rtSize = m_pRT->GetSize();
+		float minWidthHeightScale = min(rtSize.width, rtSize.height) / 512;
+
+		D2D1::Matrix3x2F scale = D2D1::Matrix3x2F::Scale(minWidthHeightScale, minWidthHeightScale);
+
+		D2D1::Matrix3x2F translation = D2D1::Matrix3x2F::Translation(rtSize.width / 2, rtSize.height / 2);
+
+		// Prepare to draw
+		m_pRT->BeginDraw();
+		// Reset to identity transform
+		m_pRT->SetTransform(D2D1::Matrix3x2F::Identity());
+		// Clear the render target
+		m_pRT->Clear(D2D1::ColorF(D2D1::ColorF::Black));
+		// Center the path
+		m_pRT->SetTransform(scale*translation);
+		// Draw the path in red
+		m_pRT->DrawGeometry(m_pPathGeometry, m_pRedBrush);
+
+		static float float_time = 0.f;
+		float length = m_Animation.GetValue(float_time);
+
+		// Ask the geometry to give us the point that responds with the length at the current time
+		hr = m_pPathGeometry->ComputePointAtLength(length, NULL, &point, &tangent);
+
+		Assert(SUCCEEDED(hr));
+
+		// Reorient the triangle so that it follows the direction of the path
+		triangleMatrix = D2D1::Matrix3x2F(tangent.x, tangent.y, -tangent.y, tangent.x, point.x, point.y);
+
+		m_pRT->SetTransform(triangleMatrix*scale*translation);
+
+		// Draw the yellow triangle
+		m_pRT->FillGeometry(m_pObjectGeometry, m_pYellowBrush);
+
+		// Commit the drawing operations
+		hr = m_pRT->EndDraw();
+
+		if (hr == D2DERR_RECREATE_TARGET)
+		{
+			hr = S_OK;
+			DiscardDeviceResources();
+		}
+
+		// When we reach the end of the animation, loop back to the beginning
+		if (float_time >= m_Animation.GetDuration())
+		{
+			float_time = 0.f;
+		}
+		else
+		{
+			float_time += static_cast<float>(m_DwmTimingInfo.rateCompose.uiDenominator) /
+				static_cast<float>(m_DwmTimingInfo.rateCompose.uiNumerator);
+		}
+	}
+
+	InvalidateRect(m_hwnd, NULL, false);
+	return hr;
+}
+
+// OnResize
+void DemoApp::OnResize(UINT width, UINT height)
+{
+	if (m_pRT)
+	{
+		D2D1_SIZE_U size;
+		size.width = width;
+		size.height = height;
+
+		m_pRT->Resize(size);
+	}
+}
+
+// Window message handler
+LRESULT CALLBACK DemoApp::WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
+{
+	LRESULT result = 0;
+	if (message == WM_CREATE)
+	{
+		LPCREATESTRUCT pcs = (LPCREATESTRUCT)lParam;
+		DemoApp *pDemoApp = (DemoApp *)pcs->lpCreateParams;
+
+		::SetWindowLongPtrW(hwnd, GWLP_USERDATA, PtrToUlong(pDemoApp));
+
+		result = 1;
+	}
+	else
+	{
+		DemoApp *pDemoApp = reinterpret_cast<DemoApp *>(static_cast<LONG_PTR>(
+			::GetWindowLongPtrW(
+				hwnd,
+				GWLP_USERDATA)));
+
+		bool wasHandled = false;
+
+		if (pDemoApp)
+		{
+			switch (message)
+			{
+			case WM_SIZE:
+				{
+					UINT width = LOWORD(lParam);
+					UINT height = HIWORD(lParam);
+					pDemoApp->OnResize(width, height);
+				}
+				result = 0;
+				wasHandled = true;
+				break;
+			case WM_PAINT:
+			case WM_DISPLAYCHANGE:
+				{
+					PAINTSTRUCT ps;
+					BeginPaint(hwnd, &ps);
+					pDemoApp->OnRender();
+					EndPaint(hwnd, &ps);
+				}
+				result = 0;
+				wasHandled = true;
+				break;
+			case WM_DESTROY:
+				{
+					PostQuitMessage(0);
+				}
+				result = 1;
+				wasHandled = true;
+				break;
+			}
+		}
+
+		if (!wasHandled)
+			result = DefWindowProc(hwnd, message, wParam, lParam);
+	}
+
+	return result;
+}
