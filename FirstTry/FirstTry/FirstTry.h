@@ -1,9 +1,5 @@
 #pragma once
 
-#pragma comment(lib,"d2d1")
-#pragma comment(lib,"dwrite")
-#pragma comment(lib,"windowscodecs")
-
 #include "stdafx.h"
 #include "resource.h"
 
@@ -13,6 +9,10 @@
 #include <d2d1helper.h>
 #include <dwrite.h>
 #include <wincodec.h>
+
+#pragma comment(lib,"d2d1")
+#pragma comment(lib,"dwrite")
+#pragma comment(lib,"windowscodecs")
 
 class FirstTry
 {
@@ -43,4 +43,11 @@ private:
 
 	// The windows procedure.
 	static LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
+
+private:
+	HWND m_hwnd;
+	ID2D1Factory* m_pDirect2dFactory;
+	ID2D1HwndRenderTarget* m_pRenderTarget;
+	ID2D1SolidColorBrush* m_pLightSlateGrayBrush;
+	ID2D1SolidColorBrush* m_pCornflowerBlueBrush;
 };
