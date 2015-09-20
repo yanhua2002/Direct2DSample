@@ -6,7 +6,7 @@
 
 FirstTry::FirstTry() :
 	m_hwnd(NULL),
-	m_pDirect2dFactory(NULL),
+	m_pD2DFactory(NULL),
 	m_pRenderTarget(NULL),
 	m_pLightSlateGrayBrush(NULL),
 	m_pCornflowerBlueBrush(NULL)
@@ -16,7 +16,7 @@ FirstTry::FirstTry() :
 
 FirstTry::~FirstTry()
 {
-	SafeRelease(&m_pDirect2dFactory);
+	SafeRelease(&m_pD2DFactory);
 	SafeRelease(&m_pRenderTarget);
 	SafeRelease(&m_pLightSlateGrayBrush);
 	SafeRelease(&m_pCornflowerBlueBrush);
@@ -45,7 +45,7 @@ HRESULT FirstTry::Initialize()
 
 		// Obtain the system DPI
 		float dpiX, dpiY;
-		m_pDirect2dFactory->GetDesktopDpi(&dpiX, &dpiY);
+		m_pD2DFactory->GetDesktopDpi(&dpiX, &dpiY);
 
 		// Create the window
 		m_hwnd = CreateWindow(L"FirstTry", L"First Try", WS_OVERLAPPEDWINDOW,
@@ -80,7 +80,7 @@ HRESULT FirstTry::CreateDeviceIndependentResources()
 	HRESULT hr = S_OK;
 	
 	// Create a Direct2D factory.
-	hr = D2D1CreateFactory(D2D1_FACTORY_TYPE_SINGLE_THREADED, &m_pDirect2dFactory);
+	hr = D2D1CreateFactory(D2D1_FACTORY_TYPE_SINGLE_THREADED, &m_pD2DFactory);
 
 	return hr;
 }
@@ -96,7 +96,7 @@ HRESULT FirstTry::CreateDeviceResources()
 		D2D1_SIZE_U size = D2D1::SizeU(rc.right - rc.left, rc.bottom - rc.top);
 
 		// Create a Direct2D render target.
-		hr = m_pDirect2dFactory->CreateHwndRenderTarget(
+		hr = m_pD2DFactory->CreateHwndRenderTarget(
 			D2D1::RenderTargetProperties(),
 			D2D1::HwndRenderTargetProperties(m_hwnd, size),
 			&m_pRenderTarget);
@@ -263,4 +263,145 @@ void FirstTry::OnResize(UINT width, UINT height)
 	{
 		m_pRenderTarget->Resize(D2D1::SizeU(width, height));
 	}
+}
+
+// Create a Direct2D bitmap from a resource in the application resource file
+HRESULT FirstTry::LoadResourceBitmap(
+	ID2D1RenderTarget *pRenderTarget,
+	IWICImagingFactory *pIWICFactory,
+	PCWSTR resourceName,
+	PCWSTR resourceType,
+	UINT destinationWidth,
+	UINT destinationHeight,
+	ID2D1Bitmap **ppBitmap)
+{
+	HRESULT hr = S_OK;
+	IWICBitmapDecoder *pDecoder = NULL;
+	IWICBitmapFrameDecode *pSource = NULL;
+	IWICStream *pStream = NULL;
+	IWICFormatConverter *pConverter = NULL;
+	IWICBitmapScaler *pScaler = NULL;
+
+	HRSRC imageResHandle = NULL;
+	HGLOBAL imageResDataHandle = NULL;
+	void *pImageFile = NULL;
+	DWORD imageFileSize = 0;
+
+	// Locate the resource
+	imageResHandle = FindResourceW(HINST_THISCOMPONENT, resourceName, resourceType);
+	hr = imageResHandle ? S_OK : E_FAIL;
+
+	if (SUCCEEDED(hr))
+	{
+		// Load the resource
+		imageResDataHandle = LoadResource(HINST_THISCOMPONENT, imageResHandle);
+		hr = imageResDataHandle ? S_OK : E_FAIL;
+
+		if (SUCCEEDED(hr))
+		{
+			// Lock it to get a system memory pointer
+			pImageFile = LockResource(imageResDataHandle);
+			hr = pImageFile ? S_OK : E_FAIL;
+		}
+
+		if (SUCCEEDED(hr))
+		{
+			// Calculate the size
+			imageFileSize = SizeofResource(HINST_THISCOMPONENT, imageResHandle);
+			hr = imageFileSize ? S_OK : E_FAIL;
+		}
+	}
+	if (SUCCEEDED(hr))
+	{
+		// Create a WIC stream to map onto the memory
+		hr = pIWICFactory->CreateStream(&pStream);
+		if (SUCCEEDED(hr))
+		{
+			// Initialize the stream with the memory pointer and size
+			hr = pStream->InitializeFromMemory(
+				reinterpret_cast<BYTE*>(pImageFile),
+				imageFileSize);
+		}
+	}
+	if (SUCCEEDED(hr))
+	{
+		hr = pIWICFactory->CreateDecoderFromStream(
+			pStream,
+			NULL,
+			WICDecodeMetadataCacheOnLoad,
+			&pDecoder);
+		if (SUCCEEDED(hr))
+		{
+			// Create the initial frame
+			hr = pDecoder->GetFrame(0, &pSource);
+		}
+	}
+	if (SUCCEEDED(hr))
+	{
+		// Convert the image format to 32bppPBGRA
+		hr = pIWICFactory->CreateFormatConverter(&pConverter);
+		if (SUCCEEDED(hr))
+		{
+			// If a new width or height was specified, create an IWICBitmapScaler and
+			// use it to resize the image
+			if (destinationWidth != 0 || destinationHeight != 0)
+			{
+				UINT originalWidth, originalHeight;
+				hr = pSource->GetSize(&originalWidth, &originalHeight);
+				if (SUCCEEDED(hr))
+				{
+					if (destinationWidth == 0)
+					{
+						float scalar = static_cast<float>(destinationHeight) / static_cast<float>(originalHeight);
+						destinationWidth = static_cast<UINT>(scalar*static_cast<float>(originalWidth));
+					}
+					else if (destinationHeight == 0)
+					{
+						float scalar = static_cast<float>(destinationWidth) / static_cast<float>(originalWidth);
+						destinationHeight = static_cast<UINT>(scalar*static_cast<float>(originalHeight));
+					}
+
+					hr = pIWICFactory->CreateBitmapScaler(&pScaler);
+					if (SUCCEEDED(hr))
+					{
+						hr = pScaler->Initialize(pSource, destinationWidth, destinationHeight, WICBitmapInterpolationModeCubic);
+
+						if (SUCCEEDED(hr))
+						{
+							hr = pConverter->Initialize(pScaler, GUID_WICPixelFormat32bppBGRA, WICBitmapDitherTypeNone, NULL, 0.f, WICBitmapPaletteTypeMedianCut);
+						}
+					}
+				}
+			}
+			else
+			{
+				hr = pConverter->Initialize(pSource, GUID_WICPixelFormat32bppPBGRA, WICBitmapDitherTypeNone, NULL, 0.f, WICBitmapPaletteTypeMedianCut);
+			}
+		}
+	}
+	if (SUCCEEDED(hr))
+	{
+		// Create a Direct2D bitmap from the WIC bitmap
+		hr = pRenderTarget->CreateBitmapFromWicBitmap(pConverter, NULL, ppBitmap);
+	}
+
+	SafeRelease(&pDecoder);
+	SafeRelease(&pSource);
+	SafeRelease(&pStream);
+	SafeRelease(&pConverter);
+	SafeRelease(&pScaler);
+
+	return hr;
+}
+
+// Create a Direct2D bitmap from the specified file name
+HRESULT FirstTry::LoadBitmapFromFile(
+	ID2D1RenderTarget *pRenderTarget,
+	IWICImagingFactory *pIWICFactory,
+	PCWSTR uri,
+	UINT destinationWidth,
+	UINT destinationHeight,
+	ID2D1Bitmap **ppBitmap)
+{
+	return E_NOTIMPL;
 }

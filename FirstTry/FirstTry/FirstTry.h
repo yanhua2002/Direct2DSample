@@ -44,10 +44,34 @@ private:
 	// The windows procedure.
 	static LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
 
+	// Load resource bitmap
+	HRESULT LoadResourceBitmap(
+		ID2D1RenderTarget *pRenderTarget,
+		IWICImagingFactory *pIWICFactory,
+		PCWSTR resourceName,
+		PCWSTR resourceType,
+		UINT destinationWidth,
+		UINT destinationHeight,
+		ID2D1Bitmap **ppBitmap);
+
+	// Load bitmap from file
+	HRESULT LoadBitmapFromFile(
+		ID2D1RenderTarget *pRenderTarget,
+		IWICImagingFactory *pIWICFactory,
+		PCWSTR uri,
+		UINT destinationWidth,
+		UINT destinationHeight,
+		ID2D1Bitmap **ppBitmap);
+
 private:
 	HWND m_hwnd;
-	ID2D1Factory* m_pDirect2dFactory;
+	ID2D1Factory* m_pD2DFactory;
+	IWICImagingFactory *m_pWICFactory;
+	IDWriteFactory *m_pDWriteFactory;
 	ID2D1HwndRenderTarget* m_pRenderTarget;
 	ID2D1SolidColorBrush* m_pLightSlateGrayBrush;
 	ID2D1SolidColorBrush* m_pCornflowerBlueBrush;
+	ID2D1Bitmap *m_pBitmap;
+	ID2D1Bitmap *m_pBitmap1;
+	IDWriteTextFormat *m_pTextFormat;
 };
