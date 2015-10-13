@@ -125,6 +125,31 @@ HRESULT FirstTry::CreateDeviceResources()
 				D2D1::ColorF(D2D1::ColorF::CornflowerBlue),
 				&m_pCornflowerBlueBrush);
 		}
+
+		// Create a bitmap from an application resource.
+		if (SUCCEEDED(hr))
+		{
+			hr = LoadResourceBitmap(
+				m_pRenderTarget,
+				m_pWICFactory,
+				L"IDB_BITMAP1",
+				L"Bitmap",
+				0,
+				0,
+				&m_pBitmap);
+		}
+
+		// Create a bitmap by loading it from a file.
+		if (SUCCEEDED(hr))
+		{
+			hr = LoadBitmapFromFile(
+				m_pRenderTarget,
+				m_pWICFactory,
+				L".\\sampleImage.jpg",
+				0,
+				0,
+				&m_pBitmap1);
+		}
 	}
 
 	return hr;
@@ -239,6 +264,14 @@ HRESULT FirstTry::OnRender()
 				0.5f);
 		}
 
+		// Draw a bitmap in the upper-left corner.
+		D2D1_SIZE_F size = m_pBitmap->GetSize();
+		m_pRenderTarget->DrawBitmap(m_pBitmap, D2D1::RectF(0.f, 0.f, size.width, size.height));
+
+		// Draw a bitmap 10 pixels off right.
+		size = m_pBitmap1->GetSize();
+		m_pRenderTarget->DrawBitmap(m_pBitmap1, D2D1::RectF(10.f, 10.f, size.width + 10.f, size.height + 10.f));
+
 		// Draw two rectangles
 		D2D1_RECT_F rectangle1 = D2D1::RectF(
 			rtSize.width / 2 - 50.f,
@@ -297,7 +330,7 @@ HRESULT FirstTry::LoadResourceBitmap(
 	DWORD imageFileSize = 0;
 
 	// Locate the resource
-	imageResHandle = FindResourceW(HINST_THISCOMPONENT, resourceName, resourceType);
+	imageResHandle = FindResource(HINST_THISCOMPONENT, resourceName, resourceType);
 	hr = imageResHandle ? S_OK : E_FAIL;
 
 	if (SUCCEEDED(hr))
