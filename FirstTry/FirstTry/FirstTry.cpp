@@ -8,8 +8,11 @@ FirstTry::FirstTry() :
 	m_hwnd(NULL),
 	m_pD2DFactory(NULL),
 	m_pRenderTarget(NULL),
+	m_pWICFactory(NULL),
 	m_pLightSlateGrayBrush(NULL),
-	m_pCornflowerBlueBrush(NULL)
+	m_pCornflowerBlueBrush(NULL),
+	m_pBitmap(NULL),
+	m_pBitmap1(NULL)
 {
 
 }
@@ -18,8 +21,11 @@ FirstTry::~FirstTry()
 {
 	SafeRelease(&m_pD2DFactory);
 	SafeRelease(&m_pRenderTarget);
+	SafeRelease(&m_pWICFactory);
 	SafeRelease(&m_pLightSlateGrayBrush);
 	SafeRelease(&m_pCornflowerBlueBrush);
+	SafeRelease(&m_pBitmap);
+	SafeRelease(&m_pBitmap1);
 }
 
 // Create the window, show it.
@@ -81,6 +87,9 @@ HRESULT FirstTry::CreateDeviceIndependentResources()
 	
 	// Create a Direct2D factory.
 	hr = D2D1CreateFactory(D2D1_FACTORY_TYPE_SINGLE_THREADED, &m_pD2DFactory);
+
+	if (SUCCEEDED(hr))
+		hr = CoCreateInstance(CLSID_WICImagingFactory, NULL, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&m_pWICFactory));
 
 	return hr;
 }
