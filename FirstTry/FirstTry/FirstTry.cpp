@@ -132,8 +132,8 @@ HRESULT FirstTry::CreateDeviceResources()
 			hr = LoadResourceBitmap(
 				m_pRenderTarget,
 				m_pWICFactory,
-				L"IDB_BITMAP1",
-				L"Bitmap",
+				L"SAMPLEIMAGE",
+				L"IMAGE",
 				0,
 				0,
 				&m_pBitmap);
