@@ -12,13 +12,18 @@ FirstTry::FirstTry() :
 	m_pLightSlateGrayBrush(NULL),
 	m_pCornflowerBlueBrush(NULL),
 	m_pBitmap(NULL),
-	m_pBitmap1(NULL)
+	m_pBitmap1(NULL),
+	m_pAnimationManager(NULL),
+	m_pAnimationTimer(NULL),
+	m_pTransitionLibrary(NULL),
+	m_pAnimationVariableAngle(NULL)
 {
 
 }
 
 FirstTry::~FirstTry()
 {
+	// D2D
 	SafeRelease(&m_pD2DFactory);
 	SafeRelease(&m_pRenderTarget);
 	SafeRelease(&m_pWICFactory);
@@ -26,6 +31,12 @@ FirstTry::~FirstTry()
 	SafeRelease(&m_pCornflowerBlueBrush);
 	SafeRelease(&m_pBitmap);
 	SafeRelease(&m_pBitmap1);
+
+	// Animation
+	SafeRelease(&m_pAnimationManager);
+	SafeRelease(&m_pAnimationTimer);
+	SafeRelease(&m_pTransitionLibrary);
+	SafeRelease(&m_pAnimationVariableAngle);
 }
 
 // Create the window, show it.
@@ -78,6 +89,31 @@ void FirstTry::RunMessageLoop()
 	{
 		TranslateMessage(&msg);
 		DispatchMessage(&msg);
+	}
+}
+
+// Creates and initializes the main animation components.
+HRESULT FirstTry::InitializeAnimation()
+{
+	// Create Animation Manager.
+	HRESULT hr = CoCreateInstance(CLSID_UIAnimationManager, NULL, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&m_pAnimationManager));
+
+	// Create Animation Timer.
+	if (SUCCEEDED(hr))
+	{
+		hr = CoCreateInstance(CLSID_UIAnimationTimer, NULL, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&m_pAnimationTimer));
+
+		// Create Animation Transition Library
+		if (SUCCEEDED(hr))
+		{
+			hr = CoCreateInstance(CLSID_UIAnimationTransitionLibrary, NULL, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&m_pTransitionLibrary));
+
+			// Create and set the ManagerEventHandler to start updating when animations are scheduled
+			if (SUCCEEDED(hr))
+			{
+				IUIAnimationManagerEventHandler *pManagerEventHandler;
+			}
+		}
 	}
 }
 

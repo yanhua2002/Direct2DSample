@@ -10,6 +10,8 @@
 #include <dwrite.h>
 #include <wincodec.h>
 
+#include <UIAnimation.h>
+
 #pragma comment(lib,"d2d1")
 #pragma comment(lib,"dwrite")
 #pragma comment(lib,"windowscodecs")
@@ -63,8 +65,14 @@ private:
 		UINT destinationHeight,
 		ID2D1Bitmap **ppBitmap);
 
+	// Animation components
+	HRESULT InitializeAnimation();
+	HRESULT CreateAnimationVariable();
+
 private:
 	HWND m_hwnd;
+
+	// D2D components
 	ID2D1Factory* m_pD2DFactory;
 	IWICImagingFactory *m_pWICFactory;
 	IDWriteFactory *m_pDWriteFactory;
@@ -74,4 +82,12 @@ private:
 	ID2D1Bitmap *m_pBitmap;
 	ID2D1Bitmap *m_pBitmap1;
 	IDWriteTextFormat *m_pTextFormat;
+
+	// Animation components
+	IUIAnimationManager *m_pAnimationManager;
+	IUIAnimationTimer *m_pAnimationTimer;
+	IUIAnimationTransitionLibrary *m_pTransitionLibrary;
+
+	// Animated Variables
+	IUIAnimationVariable *m_pAnimationVariableAngle;
 };
