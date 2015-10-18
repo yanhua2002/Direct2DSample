@@ -27,6 +27,8 @@ public:
 	// Process and dispatch messages.
 	void RunMessageLoop();
 
+	HRESULT Invalidate();
+
 private:
 	// Initialize device-independent resources.
 	HRESULT CreateDeviceIndependentResources();
@@ -38,6 +40,7 @@ private:
 	void DiscardDeviceResources();
 
 	// Draw content.
+	HRESULT OnPaint();
 	HRESULT OnRender();
 
 	// Resize the render target.
@@ -67,10 +70,12 @@ private:
 
 	// Animation components
 	HRESULT InitializeAnimation();
-	HRESULT CreateAnimationVariable();
+	HRESULT CreateAnimationVariables();
+	HRESULT AcceleratingRotation();
 
 private:
 	HWND m_hwnd;
+	DOUBLE currentAngle = 0;
 
 	// D2D components
 	ID2D1Factory* m_pD2DFactory;
@@ -89,5 +94,5 @@ private:
 	IUIAnimationTransitionLibrary *m_pTransitionLibrary;
 
 	// Animated Variables
-	IUIAnimationVariable *m_pAnimationVariableAngle;
+	IUIAnimationVariable *m_pAnimationVarAngle;
 };

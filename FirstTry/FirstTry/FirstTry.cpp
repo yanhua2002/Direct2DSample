@@ -3,6 +3,7 @@
 
 #include "stdafx.h"
 #include "FirstTry.h"
+#include "ManagerEventHandler.h"
 
 FirstTry::FirstTry() :
 	m_hwnd(NULL),
@@ -16,7 +17,7 @@ FirstTry::FirstTry() :
 	m_pAnimationManager(NULL),
 	m_pAnimationTimer(NULL),
 	m_pTransitionLibrary(NULL),
-	m_pAnimationVariableAngle(NULL)
+	m_pAnimationVarAngle(NULL)
 {
 
 }
@@ -36,7 +37,7 @@ FirstTry::~FirstTry()
 	SafeRelease(&m_pAnimationManager);
 	SafeRelease(&m_pAnimationTimer);
 	SafeRelease(&m_pTransitionLibrary);
-	SafeRelease(&m_pAnimationVariableAngle);
+	SafeRelease(&m_pAnimationVarAngle);
 }
 
 // Create the window, show it.
@@ -72,8 +73,17 @@ HRESULT FirstTry::Initialize()
 		hr = m_hwnd ? S_OK : E_FAIL;
 		if (SUCCEEDED(hr))
 		{
-			ShowWindow(m_hwnd, SW_SHOWNORMAL);
-			UpdateWindow(m_hwnd);
+			// Initialize Animation.
+			hr = InitializeAnimation();
+			if (SUCCEEDED(hr))
+			{
+				hr = CreateAnimationVariables();
+				if (SUCCEEDED(hr))
+				{
+					ShowWindow(m_hwnd, SW_SHOWNORMAL);
+					UpdateWindow(m_hwnd);
+				}
+			}
 		}
 	}
 
@@ -90,6 +100,15 @@ void FirstTry::RunMessageLoop()
 		TranslateMessage(&msg);
 		DispatchMessage(&msg);
 	}
+}
+
+// Invalidates the client area for redrawing.
+HRESULT FirstTry::Invalidate()
+{
+	BOOL bResult = InvalidateRect(m_hwnd, NULL, FALSE);
+	HRESULT hr = bResult ? S_OK : E_FAIL;
+
+	return hr;
 }
 
 // Creates and initializes the main animation components.
@@ -112,9 +131,28 @@ HRESULT FirstTry::InitializeAnimation()
 			if (SUCCEEDED(hr))
 			{
 				IUIAnimationManagerEventHandler *pManagerEventHandler;
+				hr = CManagerEventHandler::CreateInstance(this, &pManagerEventHandler);
+				if (SUCCEEDED(hr))
+				{
+					hr = m_pAnimationManager->SetManagerEventHandler(pManagerEventHandler);
+					pManagerEventHandler->Release();
+				}
 			}
 		}
 	}
+
+	return hr;
+}
+
+// Creates the animation variables
+HRESULT FirstTry::CreateAnimationVariables()
+{
+	const DOUBLE INITIALRPM = 0.f;
+	HRESULT hr = m_pAnimationManager->CreateAnimationVariable(
+		INITIALRPM,
+		&m_pAnimationVarAngle);
+
+	return hr;
 }
 
 HRESULT FirstTry::CreateDeviceIndependentResources()
@@ -231,18 +269,27 @@ LRESULT CALLBACK FirstTry::WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARA
 				wasHandled = true;
 				break;
 
-			case WM_DISPLAYCHANGE:
+			case WM_LBUTTONDOWN:
 				{
-					InvalidateRect(hwnd, NULL, FALSE);
+					pFirstTry->AcceleratingRotation();
 				}
 				result = 0;
 				wasHandled = true;
 				break;
 
+			case WM_DISPLAYCHANGE:
+				//{
+				//	InvalidateRect(hwnd, NULL, FALSE);
+				//}
+				//result = 0;
+				//wasHandled = true;
+				//break;
+
 			case WM_PAINT:
 				{
-					pFirstTry->OnRender();
-					ValidateRect(hwnd, NULL);
+					//pFirstTry->OnRender();
+					//ValidateRect(hwnd, NULL);
+					pFirstTry->OnPaint();
 				}
 				result = 0;
 				wasHandled = true;
@@ -265,6 +312,36 @@ LRESULT CALLBACK FirstTry::WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARA
 	return result;
 }
 
+// Called whenever the client area needs to be drawn
+HRESULT FirstTry::OnPaint()
+{
+	// Update the animation manager with the current time
+	UI_ANIMATION_SECONDS secondsNow;
+	HRESULT hr = m_pAnimationTimer->GetTime(&secondsNow);
+	if (SUCCEEDED(hr))
+	{
+		hr = m_pAnimationManager->Update(secondsNow);
+
+		// Read the values of the animation variables and draw the client area
+		hr = OnRender();
+		if (SUCCEEDED(hr))
+		{
+			// Continue redrawing the client area as long as there are animations scheduled.
+			UI_ANIMATION_MANAGER_STATUS status;
+			hr = m_pAnimationManager->GetStatus(&status);
+			if (SUCCEEDED(hr))
+			{
+				if (status == UI_ANIMATION_MANAGER_BUSY)
+				{
+					InvalidateRect(m_hwnd, NULL, FALSE);
+				}					
+			}
+		}
+	}
+
+	return hr;
+}
+
 HRESULT FirstTry::OnRender()
 {
 	HRESULT hr = S_OK;
@@ -279,26 +356,34 @@ HRESULT FirstTry::OnRender()
 		// Retrieve the size of the drawing area.
 		D2D1_SIZE_F rtSize = m_pRenderTarget->GetSize();
 
-		// Draw a grid background by using a for loop and the render target's DrawLine method.
-		int width = static_cast<int>(rtSize.width);
-		int height = static_cast<int>(rtSize.height);
+		//// Draw a grid background by using a for loop and the render target's DrawLine method.
+		//int width = static_cast<int>(rtSize.width);
+		//int height = static_cast<int>(rtSize.height);
 
-		for (int x = 0; x < width; x+=10)
-		{
-			m_pRenderTarget->DrawLine(
-				D2D1::Point2F(static_cast<FLOAT>(x), 0.f),
-				D2D1::Point2F(static_cast<FLOAT>(x), rtSize.height),
-				m_pLightSlateGrayBrush,
-				0.5f);
-		}
-		for (int y = 0; y < height; y+=10)
-		{
-			m_pRenderTarget->DrawLine(
-				D2D1::Point2F(0.f, static_cast<float>(y)),
-				D2D1::Point2F(rtSize.width, static_cast<float>(y)),
-				m_pLightSlateGrayBrush,
-				0.5f);
-		}
+		//for (int x = 0; x < width; x+=10)
+		//{
+		//	m_pRenderTarget->DrawLine(
+		//		D2D1::Point2F(static_cast<FLOAT>(x), 0.f),
+		//		D2D1::Point2F(static_cast<FLOAT>(x), rtSize.height),
+		//		m_pLightSlateGrayBrush,
+		//		0.5f);
+		//}
+		//for (int y = 0; y < height; y+=10)
+		//{
+		//	m_pRenderTarget->DrawLine(
+		//		D2D1::Point2F(0.f, static_cast<float>(y)),
+		//		D2D1::Point2F(rtSize.width, static_cast<float>(y)),
+		//		m_pLightSlateGrayBrush,
+		//		0.5f);
+		//}
+
+		// Get the animation variable value
+		DOUBLE angleNow;
+		hr = m_pAnimationVarAngle->GetValue(&angleNow);
+		//currentAngle += angleNow*(secondsCurrent - secondsPrev);
+		//currentAngle += 720 - sqrt(720 * 720 - angleNow*angleNow);
+		
+		m_pRenderTarget->SetTransform(D2D1::Matrix3x2F::Rotation(angleNow, D2D1::Point2F(rtSize.width / 2, rtSize.height / 2)));
 
 		// Draw a bitmap in the upper-left corner.
 		D2D1_SIZE_F size = m_pBitmap->GetSize();
@@ -308,20 +393,20 @@ HRESULT FirstTry::OnRender()
 		size = m_pBitmap1->GetSize();
 		m_pRenderTarget->DrawBitmap(m_pBitmap1, D2D1::RectF(10.f, 10.f, size.width + 10.f, size.height + 10.f));
 
-		// Draw two rectangles
-		D2D1_RECT_F rectangle1 = D2D1::RectF(
-			rtSize.width / 2 - 50.f,
-			rtSize.height / 2 - 50.f,
-			rtSize.width / 2 + 50.f,
-			rtSize.height / 2 + 50.f);
-		D2D1_RECT_F rectangle2 = D2D1::RectF(
-			rtSize.width / 2 - 100.f,
-			rtSize.height / 2 - 100.f,
-			rtSize.width / 2 + 100.f,
-			rtSize.height / 2 + 100.f);
+		//// Draw two rectangles
+		//D2D1_RECT_F rectangle1 = D2D1::RectF(
+		//	rtSize.width / 2 - 50.f,
+		//	rtSize.height / 2 - 50.f,
+		//	rtSize.width / 2 + 50.f,
+		//	rtSize.height / 2 + 50.f);
+		//D2D1_RECT_F rectangle2 = D2D1::RectF(
+		//	rtSize.width / 2 - 100.f,
+		//	rtSize.height / 2 - 100.f,
+		//	rtSize.width / 2 + 100.f,
+		//	rtSize.height / 2 + 100.f);
 
-		m_pRenderTarget->FillRectangle(&rectangle1, m_pLightSlateGrayBrush);
-		m_pRenderTarget->DrawRectangle(&rectangle2, m_pCornflowerBlueBrush);
+		//m_pRenderTarget->FillRectangle(&rectangle1, m_pLightSlateGrayBrush);
+		//m_pRenderTarget->DrawRectangle(&rectangle2, m_pCornflowerBlueBrush);
 
 		hr = m_pRenderTarget->EndDraw();
 	}
@@ -578,6 +663,64 @@ HRESULT FirstTry::LoadBitmapFromFile(
 	SafeRelease(&pStream);
 	SafeRelease(&pConverter);
 	SafeRelease(&pScaler);
+
+	return hr;
+}
+
+// Animates the angle
+HRESULT FirstTry::AcceleratingRotation()
+{
+	const UI_ANIMATION_SECONDS DURATION = 2;
+	const UI_ANIMATION_SECONDS PERIOD = 8;
+	const DOUBLE miniValue = -720;
+	const DOUBLE maxiValue = 720;
+
+	const DOUBLE finalValue = 720;
+	const DOUBLE finalVelocity = 720;
+	const DOUBLE acceleration = 360;
+
+	const DOUBLE speed = 720;
+	const DOUBLE finalValue1 = 7200000;
+
+	// Create a storyboard
+	IUIAnimationStoryboard *pStoryboard = NULL;
+	HRESULT hr = m_pAnimationManager->CreateStoryboard(&pStoryboard);
+
+	// Create transition for the angle
+	if (SUCCEEDED(hr))
+	{
+		IUIAnimationTransition *pTransitionRPMAccelerating;
+		//hr = m_pTransitionLibrary->CreateSinusoidalTransitionFromRange(
+		//	DURATION,
+		//	miniValue,
+		//	maxiValue,
+		//	PERIOD,
+		//	UI_ANIMATION_SLOPE_INCREASING,
+		//	&pTransitionRPMAccelerating);
+		hr = m_pTransitionLibrary->CreateParabolicTransitionFromAcceleration(
+			finalValue,
+			finalVelocity,
+			acceleration,
+			&pTransitionRPMAccelerating);
+
+		if (SUCCEEDED(hr))
+		{
+			// Add the transition to the stroyboard.
+			hr = pStoryboard->AddTransition(m_pAnimationVarAngle, pTransitionRPMAccelerating);
+			if (SUCCEEDED(hr))
+			{
+				// Get the current time and schedule the storyboard for play
+				UI_ANIMATION_SECONDS secondsNow;
+				hr = m_pAnimationTimer->GetTime(&secondsNow);
+				if (SUCCEEDED(hr))
+					hr = pStoryboard->Schedule(secondsNow);
+			}
+
+			pTransitionRPMAccelerating->Release();
+		}
+
+		pStoryboard->Release();
+	}
 
 	return hr;
 }
