@@ -690,33 +690,38 @@ HRESULT FirstTry::AcceleratingRotation()
 	if (SUCCEEDED(hr))
 	{
 		IUIAnimationTransition *pTransitionRPMAccelerating;
-		//hr = m_pTransitionLibrary->CreateSinusoidalTransitionFromRange(
-		//	DURATION,
-		//	miniValue,
-		//	maxiValue,
-		//	PERIOD,
-		//	UI_ANIMATION_SLOPE_INCREASING,
-		//	&pTransitionRPMAccelerating);
 		hr = m_pTransitionLibrary->CreateParabolicTransitionFromAcceleration(
 			finalValue,
 			finalVelocity,
 			acceleration,
 			&pTransitionRPMAccelerating);
-
 		if (SUCCEEDED(hr))
 		{
-			// Add the transition to the stroyboard.
-			hr = pStoryboard->AddTransition(m_pAnimationVarAngle, pTransitionRPMAccelerating);
+			IUIAnimationTransition *pTransitionRPMHolding;
+			hr = m_pTransitionLibrary->CreateLinearTransitionFromSpeed(
+				speed,
+				finalValue1,
+				&pTransitionRPMHolding);
+
 			if (SUCCEEDED(hr))
 			{
-				// Get the current time and schedule the storyboard for play
-				UI_ANIMATION_SECONDS secondsNow;
-				hr = m_pAnimationTimer->GetTime(&secondsNow);
+				// Add the transition to the stroyboard.
+				hr = pStoryboard->AddTransition(m_pAnimationVarAngle, pTransitionRPMAccelerating);
 				if (SUCCEEDED(hr))
-					hr = pStoryboard->Schedule(secondsNow);
+				{
+					hr = pStoryboard->AddTransition(m_pAnimationVarAngle, pTransitionRPMHolding);
+					if (SUCCEEDED(hr))
+					{
+						// Get the current time and schedule the storyboard for play
+						UI_ANIMATION_SECONDS secondsNow;
+						hr = m_pAnimationTimer->GetTime(&secondsNow);
+						if (SUCCEEDED(hr))
+							hr = pStoryboard->Schedule(secondsNow);
+					}
+					pTransitionRPMHolding->Release();
+				}
+				pTransitionRPMAccelerating->Release();
 			}
-
-			pTransitionRPMAccelerating->Release();
 		}
 
 		pStoryboard->Release();
