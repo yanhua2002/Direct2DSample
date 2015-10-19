@@ -147,9 +147,9 @@ HRESULT FirstTry::InitializeAnimation()
 // Creates the animation variables
 HRESULT FirstTry::CreateAnimationVariables()
 {
-	const DOUBLE INITIALRPM = 0.f;
+	const DOUBLE INITIALANGLE = 0;
 	HRESULT hr = m_pAnimationManager->CreateAnimationVariable(
-		INITIALRPM,
+		INITIALANGLE,
 		&m_pAnimationVarAngle);
 
 	return hr;
@@ -670,14 +670,14 @@ HRESULT FirstTry::LoadBitmapFromFile(
 // Animates the angle
 HRESULT FirstTry::AcceleratingRotation()
 {
-	const UI_ANIMATION_SECONDS DURATION = 2;
-	const UI_ANIMATION_SECONDS PERIOD = 8;
-	const DOUBLE miniValue = -720;
-	const DOUBLE maxiValue = 720;
+	//const UI_ANIMATION_SECONDS DURATION = 2;
+	//const UI_ANIMATION_SECONDS PERIOD = 8;
+	//const DOUBLE miniValue = -720;
+	//const DOUBLE maxiValue = 720;
 
-	const DOUBLE finalValue = 720;
+	const DOUBLE finalValue = 360;
 	const DOUBLE finalVelocity = 720;
-	const DOUBLE acceleration = 360;
+	const DOUBLE acceleration = 720;
 
 	const DOUBLE speed = 720;
 	const DOUBLE finalValue1 = 7200000;
